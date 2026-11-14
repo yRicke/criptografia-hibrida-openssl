@@ -1,0 +1,8 @@
+__pycache__/
+*.pem
+*.bin
+*.enc
+*.sig
+saida/
+mensagem_restaurada.txt
+*.b64
