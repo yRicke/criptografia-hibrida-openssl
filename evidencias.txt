@@ -1,0 +1,43 @@
+PARTE 2 | Prática com OpenSSL
+$ openssl version
+OpenSSL 3.5.7 9 Jun 2026 (Library: OpenSSL 3.5.7 9 Jun 2026)
+
+2a. Geração das chaves
+$ openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out privada.pem 2> rsa-geracao.log
+$ openssl pkey -in privada.pem -pubout -out publica.pem
+$ openssl pkey -pubin -in publica.pem -text -noout | sed -n 1p
+Public-Key: (2048 bit)
+$ openssl rand -out chave_aes.bin 32
+$ wc -c < chave_aes.bin
+32
+
+2b. Cifragem
+$ openssl base64 -A -in chave_aes.bin -out chave_aes.b64
+$ openssl enc -aes-256-cbc -e -pbkdf2 -md sha256 -in mensagem.txt -out mensagem.enc -pass file:chave_aes.b64
+$ openssl pkeyutl -encrypt -pubin -inkey publica.pem -in chave_aes.bin -out chave_aes.enc -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 -pkeyopt rsa_mgf1_md:sha256
+$ wc -c mensagem.enc chave_aes.enc
+ 96 mensagem.enc
+256 chave_aes.enc
+352 total
+
+2c. Decifragem e verificação
+$ openssl pkeyutl -decrypt -inkey privada.pem -in chave_aes.enc -out chave_aes_rec.bin -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 -pkeyopt rsa_mgf1_md:sha256
+$ openssl base64 -A -in chave_aes_rec.bin -out chave_aes_rec.b64
+$ openssl enc -aes-256-cbc -d -pbkdf2 -md sha256 -in mensagem.enc -out mensagem_restaurada.txt -pass file:chave_aes_rec.b64
+$ openssl dgst -sha256 mensagem.txt mensagem_restaurada.txt
+SHA2-256(mensagem.txt)= f913bd0b0420a790e87a34dc19195325410cee7b316cfe1dbf4849b4e0c37b3e
+SHA2-256(mensagem_restaurada.txt)= f913bd0b0420a790e87a34dc19195325410cee7b316cfe1dbf4849b4e0c37b3e
+$ cmp mensagem.txt mensagem_restaurada.txt
+OK: arquivos idênticos byte a byte.
+
+PARTE 3 | Teste round-trip na aplicação
+$ python3 app.py cifrar mensagem.txt publica.pem saida
+Arquivo cifrado em saida/mensagem.enc
+Chave cifrada em saida/chave_aes.enc
+$ python3 app.py decifrar saida privada.pem restaurada_app.txt
+Arquivo restaurado em restaurada_app.txt
+$ openssl dgst -sha256 mensagem.txt restaurada_app.txt
+SHA2-256(mensagem.txt)= f913bd0b0420a790e87a34dc19195325410cee7b316cfe1dbf4849b4e0c37b3e
+SHA2-256(restaurada_app.txt)= f913bd0b0420a790e87a34dc19195325410cee7b316cfe1dbf4849b4e0c37b3e
+$ cmp mensagem.txt restaurada_app.txt
+OK: arquivos idênticos byte a byte.
